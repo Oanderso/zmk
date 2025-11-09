@@ -23,7 +23,7 @@ jobs:
       image: zmkfirmware/zmk-build-arm:2.5
 
     steps:
-      - name: Checkout ZMK fork (this repo)
+      - name: Checkout ZMK fork
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -36,7 +36,7 @@ jobs:
           ref: ${{ github.event.inputs.config_ref }}
           path: config
 
-      - name: West init & update (use this fork as manifest)
+      - name: West init & update
         run: |
           west init -m "$GITHUB_WORKSPACE" -mr "${{ github.event.inputs.zmk_ref }}" workspace
           cd workspace
@@ -56,26 +56,17 @@ jobs:
             -DZMK_CONFIG="${{ github.workspace }}/config"
           cp build/right/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/right.uf2"
 
-      # Optional: build both reset variants; keep if useful
-      - name: Build settings_reset (nice_nano) # original nice!nano
+      - name: Build settings_reset (nice_nano_v2 only)
         run: |
           cd workspace
-          west build -s zmk/app -d build/reset_nn -b nice_nano -- \
+          west build -s zmk/app -d build/reset -b nice_nano_v2 -- \
             -DZMK_CONFIG="${{ github.workspace }}/config" -DSHIELD=settings_reset
-          cp build/reset_nn/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset_nice_nano.uf2"
+          cp build/reset/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset.uf2"
 
-      - name: Build settings_reset (nice_nano_v2) # nice!nano v2
-        run: |
-          cd workspace
-          west build -s zmk/app -d build/reset_nnv2 -b nice_nano_v2 -- \
-            -DZMK_CONFIG="${{ github.workspace }}/config" -DSHIELD=settings_reset
-          cp build/reset_nnv2/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset_nice_nano_v2.uf2"
-
-      - name: Create single ZIP bundle
+      - name: Create firmware ZIP bundle
         run: |
           cd "$GITHUB_WORKSPACE"
-          # include only what you want in the bundle:
-          zip -j firmware.zip left.uf2 right.uf2 settings_reset_nice_nano.uf2 settings_reset_nice_nano_v2.uf2
+          zip -j firmware.zip left.uf2 right.uf2 settings_reset.uf2
 
       - name: Upload firmware bundle
         uses: actions/upload-artifact@v4
