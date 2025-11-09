@@ -49,7 +49,7 @@ jobs:
 
       - name: West init & update (use this fork as manifest)
         run: |
-          west init -m $GITHUB_WORKSPACE -mr ${{ github.event.inputs.zmk_ref }} workspace
+          west init -m "$GITHUB_WORKSPACE" -mr "${{ github.event.inputs.zmk_ref }}" workspace
           cd workspace
           west update
 
@@ -57,33 +57,33 @@ jobs:
         run: |
           cd workspace
           west build -s zmk/app -d build/left -b corneish_zen_v1_left -- \
-            -DZMK_CONFIG=${{ github.workspace }}/config
+            -DZMK_CONFIG="${{ github.workspace }}/config"
           echo "== LEFT keymap path =="
           grep -R "Using keymap file:" build/left || true
-          cp build/left/zephyr/zmk.uf2 $GITHUB_WORKSPACE/corneish_zen_v1_left.uf2
+          cp build/left/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/corneish_zen_v1_left.uf2"
 
       - name: Build RIGHT (corneish_zen_v1_right)
         run: |
           cd workspace
           west build -s zmk/app -d build/right -b corneish_zen_v1_right -- \
-            -DZMK_CONFIG=${{ github.workspace }}/config
+            -DZMK_CONFIG="${{ github.workspace }}/config"
           echo "== RIGHT keymap path =="
           grep -R "Using keymap file:" build/right || true
-          cp build/right/zephyr/zmk.uf2 $GITHUB_WORKSPACE/corneish_zen_v1_right.uf2
+          cp build/right/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/corneish_zen_v1_right.uf2"
 
-      - name: Build settings_reset (nice_nano)  # for original nice!nano
+      - name: Build settings_reset (nice_nano) # for original nice!nano
         run: |
           cd workspace
           west build -s zmk/app -d build/reset_nn -b nice_nano -- \
-            -DZMK_CONFIG=${{ github.workspace }}/config -DSHIELD=settings_reset
-          cp build/reset_nn/zephyr/zmk.uf2 $GITHUB_WORKSPACE/settings_reset_nice_nano.uf2
+            -DZMK_CONFIG="${{ github.workspace }}/config" -DSHIELD=settings_reset
+          cp build/reset_nn/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset_nice_nano.uf2"
 
-      - name: Build settings_reset (nice_nano_v2)  # for nice!nano v2
+      - name: Build settings_reset (nice_nano_v2) # for nice!nano v2
         run: |
           cd workspace
           west build -s zmk/app -d build/reset_nnv2 -b nice_nano_v2 -- \
-            -DZMK_CONFIG=${{ github.workspace }}/config -DSHIELD=settings_reset
-          cp build/reset_nnv2/zephyr/zmk.uf2 $GITHUB_WORKSPACE/settings_reset_nice_nano_v2.uf2
+            -DZMK_CONFIG="${{ github.workspace }}/config" -DSHIELD=settings_reset
+          cp build/reset_nnv2/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset_nice_nano_v2.uf2"
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
