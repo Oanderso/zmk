@@ -1,0 +1,77 @@
+name: Build Corne-ish Zen v1 (from ZMK fork)
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_repo:
+        description: "Config repo (owner/name), e.g. Oanderso/zmk-config-zen-2"
+        required: true
+        default: "Oanderso/zmk-config-zen-2"
+      config_ref:
+        description: "Config ref (branch/tag/commit)"
+        required: true
+        default: "main"
+      zmk_ref:
+        description: "ZMK ref in THIS fork (branch/tag/commit)"
+        required: true
+        default: "main"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:2.5
+
+    steps:
+      - name: Checkout ZMK fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.zmk_ref }}
+
+      - name: Checkout CONFIG repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.config_repo }}
+          ref: ${{ github.event.inputs.config_ref }}
+          path: config
+
+      - name: West init & update
+        run: |
+          west init -m "$GITHUB_WORKSPACE" -mr "${{ github.event.inputs.zmk_ref }}" workspace
+          cd workspace
+          west update
+
+      - name: Build LEFT (corneish_zen_v1_left)
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/left -b corneish_zen_v1_left -- \
+            -DZMK_CONFIG="${{ github.workspace }}/config"
+          cp build/left/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/left.uf2"
+
+      - name: Build RIGHT (corneish_zen_v1_right)
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/right -b corneish_zen_v1_right -- \
+            -DZMK_CONFIG="${{ github.workspace }}/config"
+          cp build/right/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/right.uf2"
+
+      - name: Build settings_reset (nice_nano_v2 only)
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/reset -b nice_nano_v2 -- \
+            -DZMK_CONFIG="${{ github.workspace }}/config" -DSHIELD=settings_reset
+          cp build/reset/zephyr/zmk.uf2 "$GITHUB_WORKSPACE/settings_reset.uf2"
+
+      - name: Create firmware ZIP bundle
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          zip -j firmware.zip left.uf2 right.uf2 settings_reset.uf2
+
+      - name: Upload firmware bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware_bundle
+          path: firmware.zip
+          if-no-files-found: error
+          retention-days: 7
