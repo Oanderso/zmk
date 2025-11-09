@@ -1,0 +1,98 @@
+name: Build Corne-ish Zen v1 (from ZMK fork)
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_repo:
+        description: "Config repo (owner/name), e.g. Oanderso/zmk-config-zen-2"
+        required: true
+        default: "Oanderso/zmk-config-zen-2"
+      config_ref:
+        description: "Config ref (branch/tag/commit)"
+        required: true
+        default: "main"
+      zmk_ref:
+        description: "ZMK ref in THIS fork (branch/tag/commit)"
+        required: true
+        default: "main"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:2.5
+
+    steps:
+      - name: Checkout ZMK fork (this repo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.zmk_ref }}
+
+      - name: Checkout CONFIG repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.config_repo }}
+          ref: ${{ github.event.inputs.config_ref }}
+          path: config
+
+      - name: Show config files detected
+        run: |
+          echo "== ZMK ref = ${{ github.event.inputs.zmk_ref }}"
+          echo "== CONFIG = ${{ github.event.inputs.config_repo }} @ ${{ github.event.inputs.config_ref }}"
+          ls -la config || true
+          for f in corneish_zen_v1.keymap corneish_zen.keymap corneish_zen_v1.conf corneish_zen.conf; do
+            if [ -f "config/$f" ]; then
+              echo "Found config/$f"
+            fi
+          done
+
+      - name: West init & update (use this fork as manifest)
+        run: |
+          west init -m $GITHUB_WORKSPACE -mr ${{ github.event.inputs.zmk_ref }} workspace
+          cd workspace
+          west update
+
+      - name: Build LEFT (corneish_zen_v1_left)
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/left -b corneish_zen_v1_left -- \
+            -DZMK_CONFIG=${{ github.workspace }}/config
+          echo "== LEFT keymap path =="
+          grep -R "Using keymap file:" build/left || true
+          cp build/left/zephyr/zmk.uf2 $GITHUB_WORKSPACE/corneish_zen_v1_left.uf2
+
+      - name: Build RIGHT (corneish_zen_v1_right)
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/right -b corneish_zen_v1_right -- \
+            -DZMK_CONFIG=${{ github.workspace }}/config
+          echo "== RIGHT keymap path =="
+          grep -R "Using keymap file:" build/right || true
+          cp build/right/zephyr/zmk.uf2 $GITHUB_WORKSPACE/corneish_zen_v1_right.uf2
+
+      - name: Build settings_reset (nice_nano)  # for original nice!nano
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/reset_nn -b nice_nano -- \
+            -DZMK_CONFIG=${{ github.workspace }}/config -DSHIELD=settings_reset
+          cp build/reset_nn/zephyr/zmk.uf2 $GITHUB_WORKSPACE/settings_reset_nice_nano.uf2
+
+      - name: Build settings_reset (nice_nano_v2)  # for nice!nano v2
+        run: |
+          cd workspace
+          west build -s zmk/app -d build/reset_nnv2 -b nice_nano_v2 -- \
+            -DZMK_CONFIG=${{ github.workspace }}/config -DSHIELD=settings_reset
+          cp build/reset_nnv2/zephyr/zmk.uf2 $GITHUB_WORKSPACE/settings_reset_nice_nano_v2.uf2
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            corneish_zen_v1_left.uf2
+            corneish_zen_v1_right.uf2
+            settings_reset_nice_nano.uf2
+            settings_reset_nice_nano_v2.uf2
+          if-no-files-found: error
+          retention-days: 7
